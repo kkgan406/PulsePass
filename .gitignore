@@ -1,0 +1,20 @@
+# Local editor and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Future build and runtime artifacts
+target/
+*.log
+.env
+
+# Local secrets
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+credentials*

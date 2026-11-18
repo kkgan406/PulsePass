@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3307/pulsepass?allowPublicKeyRetrieval=true&sslMode=DISABLED}
+    username: ${DB_USERNAME:pulsepass}
+    password: ${DB_PASSWORD}

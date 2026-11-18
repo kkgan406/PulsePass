@@ -1,0 +1,14 @@
+spring:
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+      accept-float-as-int: false
+  application:
+    name: pulsepass
+server:
+  port: 8080
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
