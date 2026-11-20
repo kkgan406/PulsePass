@@ -18,3 +18,7 @@ target/
 *.p12
 *.pfx
 credentials*
+
+# Generated benchmark outputs
+benchmarks/results/*
+!benchmarks/results/.gitkeep

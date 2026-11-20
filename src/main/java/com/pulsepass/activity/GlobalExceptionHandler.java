@@ -9,9 +9,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import com.pulsepass.purchase.PurchaseException;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(PurchaseException.class)
+    ResponseEntity<ApiResponse<Void>> purchase(PurchaseException e) {
+        return ResponseEntity.status(e.status).body(new ApiResponse<>(e.code, e.getMessage(), null));
+    }
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ApiResponse<Void>> status(ResponseStatusException e) {
         int status = e.getStatusCode().value();
@@ -19,8 +25,9 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
         MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class})
-    ResponseEntity<ApiResponse<Void>> badRequest(Exception e) {
-        return ResponseEntity.badRequest().body(new ApiResponse<>("BAD_REQUEST", "Invalid request", null));
+    ResponseEntity<ApiResponse<Void>> badRequest(Exception e, HttpServletRequest request) {
+        String code = request.getMethod().equals("POST") && request.getRequestURI().equals("/api/v1/orders") ? "INVALID_ARGUMENT" : "BAD_REQUEST";
+        return ResponseEntity.badRequest().body(new ApiResponse<>(code, "Invalid request", null));
     }
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiResponse<Void>> unexpected(Exception e) {

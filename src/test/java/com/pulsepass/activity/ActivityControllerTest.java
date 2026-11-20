@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class ActivityControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean ActivityService service;
+    @MockitoBean ActivityPublicationService publication;
     @Test void rejectsBlankNameAndProtectedFields() throws Exception {
         mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON).content("""
           {"name":" ","saleStartTime":"2030-01-01T00:00:00Z","saleEndTime":"2030-01-02T00:00:00Z","eventStartTime":"2030-01-03T00:00:00Z"}

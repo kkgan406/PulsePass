@@ -26,7 +26,8 @@ public class TicketTypeService {
 
     @Transactional
     public TicketTypeResponse create(long activityId, CreateTicketTypeRequest request) {
-        Activity activity = requireActivity(activityId);
+        Activity activity = activities.lockById(activityId);
+        if (activity == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Activity not found");
         if (!ActivityStatus.DRAFT.name().equals(activity.status)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity is not DRAFT");
         }

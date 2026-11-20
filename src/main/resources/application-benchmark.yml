@@ -1,0 +1,10 @@
+server:
+  address: 127.0.0.1
+  port: 18081
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3307/pulsepass_bench?allowPublicKeyRetrieval=true&sslMode=DISABLED
+    username: pulsepass
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10

@@ -2,7 +2,7 @@
 
 PulsePass 是面向高并发活动票务与智能运营探索的个人工程项目。
 
-当前阶段：**Phase 1.1 — Activity 活动管理**。已实现活动创建、详情与分页查询；尚未实现购票系统。
+当前阶段：**Phase 1.3 — Order 基础模型**。已实现活动、票种和库存初始化及订单查询；尚未实现购票或订单创建业务。
 
 ## 计划技术路线
 
@@ -96,3 +96,35 @@ Get-Content -Raw db/migration/002_create_ticket_type_inventory.sql | docker comp
 ```
 
 外键防止引用不存在的活动或票种，唯一约束保证一个票种至多一条库存，CHECK 保证非负价格、库存及可用库存不大于总库存。必须配合服务层事务创建两条记录：单靠唯一和外键不能保证任意手工插入的票种一定有库存。MySQL 集成测试仅清理自己创建的活动和票种；运行前确认数据库配置，测试不会清空开发库。
+
+## Phase 1.3：订单模型和本地查询
+
+`GET /api/v1/orders/{orderId}` 仅供本地开发演示；目前没有身份认证或订单归属校验，不具备生产环境访问权限控制。ID 必须为正整数；金额使用整数分，`created_at` 按 UTC 毫秒解释。状态仅定义 `PENDING`、`CONFIRMED`、`CANCELLED`，未实现状态机或订单创建。
+
+执行 [003_create_ticket_order.sql](db/migration/003_create_ticket_order.sql) 前，请确认目标是预期的开发库、已应用 001 和 002，并检查 `ticket_order` 是否已存在。`IF NOT EXISTS` 不校正既有表结构；脚本不会删除数据，也不代表已启用 Flyway。
+
+```powershell
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -h127.0.0.1 -u pulsepass -D pulsepass -e "SHOW TABLES"'
+Get-Content -Raw db/migration/003_create_ticket_order.sql | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -h127.0.0.1 -u pulsepass -D pulsepass'
+```
+
+`user_id` 暂为模拟 ID，没有 User 外键。订单的 `activity_id` 必须与所选票种的活动 ID 一致；两个独立外键无法保证此规则，后续订单创建必须校验。同一用户对同一活动最多一笔有效订单（PENDING 或 CONFIRMED），CANCELLED 不占名额；不能简单使用 `(user_id, activity_id)` 唯一约束，否则会阻止取消后重新购买。并发下有效订单唯一性仍待后续设计和验证。数据库测试使用事务回滚自己的测试数据，不清空开发库。
+
+## Phase 1.4：MySQL 同步购票
+
+`PATCH /api/v1/activities/{activityId}/status` 接收 `{"status":"ON_SALE"}`，只允许尚未结束售票、时间配置有效且有可用票种及对应库存的 DRAFT 活动发布。票种创建与发布通过活动行锁协调。购票使用 `POST /api/v1/orders`，请求包含正整数 `userId`、`activityId`、`ticketTypeId`；数量固定为 1，金额从票种读取。售票时间沿用 Phase 0 的闭区间 `saleStartTime <= now <= saleEndTime`，时间按 UTC 解释。
+
+当前 `userId` 是客户端提供的开发测试身份；发布、购票及订单查询均未实现身份认证、授权或订单归属校验，只可在可信的本地环境演示。成功返回 201；重复购买、库存不足、活动不可售返回 409，其他错误按响应 `code` 区分。
+
+应用 [004_active_order_uniqueness.sql](db/migration/004_active_order_uniqueness.sql) 前先确认正确数据库，检查是否已有等价约束、重复有效订单和非法状态；若存在冲突则停止，不删除历史数据。MySQL DDL 会隐式提交，应用后请检查生成列、唯一索引和状态 CHECK；此脚本不是自动迁移。可先使用以下只读 SQL 检查：
+
+```sql
+SELECT user_id, activity_id, COUNT(*) FROM ticket_order
+WHERE BINARY status IN ('PENDING', 'CONFIRMED')
+GROUP BY user_id, activity_id HAVING COUNT(*) > 1;
+SELECT status, COUNT(*) FROM ticket_order
+WHERE BINARY status NOT IN ('PENDING', 'CONFIRMED', 'CANCELLED') GROUP BY status;
+SHOW CREATE TABLE ticket_order;
+```
+
+购票事务使用库存条件更新和数据库有效订单唯一索引；数据库死锁、锁等待等非预期异常不会当作售罄。本轮没有自动重试。Phase 2 的独立错误实现实验见 [并发实验计划](docs/phase-2/01-concurrency-experiment.md)。
